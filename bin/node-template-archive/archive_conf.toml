@@ -23,4 +23,4 @@ db_user = "postgres"
 # Can also be specified with DB_PASS environment variable
 db_pass = "123"
 # Can also be specified with DB_NAME environment variable
-db_name = "polkadot_db"
+db_name = "archive"

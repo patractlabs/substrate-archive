@@ -154,8 +154,6 @@ impl Chunk {
 	}
 
 	async fn execute(self, conn: &mut PgConnection) -> Result<u64> {
-		//log::info!("execute {:?}",self.query);
-
 		let done = sqlx::query_with(&*self.query, self.arguments.into_arguments()).execute(conn).await?;
 		Ok(done.rows_affected())
 	}
