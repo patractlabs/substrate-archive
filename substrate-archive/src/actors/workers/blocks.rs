@@ -130,7 +130,7 @@ where
 		let mut max_to_collect = start_to_collect + self.max_block_load;
 		let best = self.backend.best().unwrap_or(Zero::zero()).into();
 		if best > 0 {
-			max_to_collect = best;
+			max_to_collect = std::cmp::min(best, max_to_collect);
 			if best < start_to_collect {
 				start_to_collect = best - 1;
 			}
