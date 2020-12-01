@@ -24,34 +24,29 @@ use substrate_archive::{Archive, ArchiveBuilder};
 use substrate_archive_backend::SecondaryRocksDB;
 
 pub fn main() -> Result<()> {
-    let config = config::Config::new()?;
-    substrate_archive::init_logger(config.cli().log_level, log::LevelFilter::Debug)?;
+	let config = config::Config::new()?;
+	substrate_archive::init_logger(config.cli().log_level, log::LevelFilter::Debug)?;
 
-    let mut archive = ArchiveBuilder::<
-        Block,
-        runtime::RuntimeApi,
-        node_template::service::Executor,
-        SecondaryRocksDB,
-    > {
-        block_workers: config.block_workers(),
-        wasm_pages: config.wasm_pages(),
-        cache_size: config.cache_size(),
-        ..ArchiveBuilder::default()
-    }
-    .chain_data_db(config.db_path().to_str().unwrap().to_string())
-    .pg_url(config.psql_conf().url())
-    .chain_spec(Box::new(config.cli().chain_spec.clone()))
-    .build()?;
-    archive.drive()?;
+	let mut archive =
+		ArchiveBuilder::<Block, runtime::RuntimeApi, node_template::service::Executor, SecondaryRocksDB> {
+			block_workers: config.block_workers(),
+			wasm_pages: config.wasm_pages(),
+			cache_size: config.cache_size(),
+			..ArchiveBuilder::default()
+		}
+		.chain_data_db(config.db_path().to_str().unwrap().to_string())
+		.pg_url(config.psql_conf().url())
+		.chain_spec(Box::new(config.cli().chain_spec.clone()))
+		.build()?;
+	archive.drive()?;
+	let running = Arc::new(AtomicBool::new(true));
+	let r = running.clone();
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })
-    .expect("Error setting Ctrl-C handler");
-    while running.load(Ordering::SeqCst) {}
-    archive.shutdown()?;
-    Ok(())
+	ctrlc::set_handler(move || {
+		r.store(false, Ordering::SeqCst);
+	})
+	.expect("Error setting Ctrl-C handler");
+	while running.load(Ordering::SeqCst) {}
+	archive.shutdown()?;
+	Ok(())
 }

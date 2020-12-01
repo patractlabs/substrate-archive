@@ -17,7 +17,7 @@ use super::{ActorPool, DatabaseActor, GetState, Metadata};
 use crate::{actors::ActorContext, database::queries, Error::Disconnected};
 use sp_runtime::{
 	generic::SignedBlock,
-	traits::{Block as BlockT, Header as _, NumberFor},
+	traits::{Block as BlockT, Header as _, NumberFor, Zero},
 };
 use std::sync::Arc;
 use substrate_archive_backend::{ReadOnlyBackend, RuntimeVersionCache};
@@ -69,7 +69,14 @@ where
 		let backend = self.backend.clone();
 		let now = std::time::Instant::now();
 		let gather_blocks = move || -> Result<Vec<SignedBlock<B>>> {
-			Ok(backend.iter_blocks(|n| fun(n))?.enumerate().map(|(_, b)| b).collect())
+			Ok(backend
+				.iter_blocks(|n| fun(n))?
+				.enumerate()
+				.map(|(_, b)| {
+					log::info!("load block {}", (*b.block.header().number()).into());
+					b
+				})
+				.collect())
 		};
 		let blocks = smol::unblock!(gather_blocks())?;
 		log::info!("Took {:?} to load {} blocks", now.elapsed(), blocks.len());
@@ -119,9 +126,17 @@ where
 
 	/// Crawl up to `max_block_load` blocks that are greater than the last max
 	async fn crawl(&mut self) -> Result<Vec<Block<B>>> {
-		let copied_last_max = self.last_max;
-		let max_to_collect = copied_last_max + self.max_block_load;
-		let blocks = self.collect_blocks(move |n| n > copied_last_max && n <= max_to_collect).await?;
+		let mut start_to_collect = self.last_max;
+		let mut max_to_collect = start_to_collect + self.max_block_load;
+		let best = self.backend.best().unwrap_or(Zero::zero()).into();
+		if best > 0 {
+			max_to_collect = best;
+			if best < start_to_collect {
+				start_to_collect = best - 1;
+			}
+		}
+
+		let blocks = self.collect_blocks(move |n| n > start_to_collect && n <= max_to_collect).await?;
 		self.last_max = blocks
 			.iter()
 			.map(|b| (*b.inner.block.header().number()).into())
