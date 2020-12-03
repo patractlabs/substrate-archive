@@ -23,4 +23,21 @@ db_user = "postgres"
 # Can also be specified with DB_PASS environment variable
 db_pass = "123"
 # Can also be specified with DB_NAME environment variable
-db_name = "archive"
+db_name = "polkadot_db"
+
+
+[[kafka]]
+url = "localhost:9092"
+topic = "polkadot-storage"
+key="0"
+mode = "plain"
+username = "aaa"
+password = "kkk"
+
+[[kafka]]
+url = "localhost:9092"
+topic = "kusama-storage"
+key="0"
+mode = "plain"
+username = "aaa"
+password = "kkk"

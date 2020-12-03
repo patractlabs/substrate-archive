@@ -28,6 +28,7 @@ use super::{
 	tasks::Environment,
 	traits::Archive,
 };
+use crate::kafka::KafkaConfig;
 use coil::Job as _;
 use futures::FutureExt;
 use hashbrown::HashSet;
@@ -56,6 +57,7 @@ where
 	meta: Meta<B>,
 	workers: usize,
 	max_block_load: u32,
+	kafka_configs: Option<Vec<KafkaConfig>>,
 }
 
 impl<B: BlockT + Unpin, D: ReadOnlyDB> Clone for ActorContext<B, D>
@@ -69,6 +71,7 @@ where
 			meta: self.meta.clone(),
 			workers: self.workers,
 			max_block_load: self.max_block_load,
+			kafka_configs: self.kafka_configs.clone(),
 		}
 	}
 }
@@ -83,8 +86,9 @@ where
 		workers: usize,
 		pg_url: String,
 		max_block_load: u32,
+		kafka_configs: Option<Vec<KafkaConfig>>,
 	) -> Self {
-		Self { backend, meta, workers, pg_url, max_block_load }
+		Self { backend, meta, workers, pg_url, max_block_load, kafka_configs }
 	}
 
 	pub fn backend(&self) -> &Arc<ReadOnlyBackend<B, D>> {
@@ -108,6 +112,7 @@ where
 	blocks: Address<workers::BlocksIndexer<B, D>>,
 	metadata: Address<workers::Metadata<B>>,
 	db_pool: Address<ActorPool<DatabaseActor<B>>>,
+	kafka_publish: Address<workers::KafkaPublishActor<B>>,
 }
 
 /// Control the execution of the indexing engine.
@@ -160,8 +165,10 @@ where
 		workers: usize,
 		pg_url: &str,
 		max_block_load: u32,
+		kafka_configs: Option<Vec<KafkaConfig>>,
 	) -> Result<Self> {
-		let context = ActorContext::new(backend, client_api.clone(), workers, pg_url.to_string(), max_block_load);
+		let context =
+			ActorContext::new(backend, client_api.clone(), workers, pg_url.to_string(), max_block_load, kafka_configs);
 		let (start_tx, kill_tx, handle) = Self::start(context.clone(), client_api);
 
 		Ok(Self { context, start_tx, kill_tx, handle, _marker: PhantomData })
@@ -222,16 +229,24 @@ where
 	}
 
 	async fn spawn_actors(ctx: ActorContext<B, D>) -> Result<Actors<B, D>> {
+		let kafka_configs = ctx.kafka_configs.clone();
+		let kafka_publish = workers::KafkaPublishActor::new(&kafka_configs.unwrap_or(Vec::new())).await?.spawn();
 		let db = workers::DatabaseActor::<B>::new(ctx.pg_url().into()).await?;
 		let db_pool = actor_pool::ActorPool::new(db, 8).spawn();
-		let storage = workers::StorageAggregator::new(db_pool.clone()).spawn();
+		let storage = workers::StorageAggregator::new(db_pool.clone(), kafka_publish.clone()).spawn();
 		let metadata = workers::Metadata::new(db_pool.clone(), ctx.meta().clone()).await?.spawn();
 		let blocks = workers::BlocksIndexer::new(ctx, db_pool.clone(), metadata.clone()).spawn();
-		Ok(Actors { storage, blocks, metadata, db_pool })
+
+		Ok(Actors { storage, blocks, metadata, db_pool, kafka_publish })
 	}
 
 	async fn kill_actors(actors: Actors<B, D>) -> Result<()> {
-		let fut = vec![actors.storage.send(msg::Die), actors.blocks.send(msg::Die), actors.metadata.send(msg::Die)];
+		let fut = vec![
+			actors.storage.send(msg::Die),
+			actors.blocks.send(msg::Die),
+			actors.metadata.send(msg::Die),
+			actors.kafka_publish.send(msg::Die),
+		];
 		futures::future::join_all(fut).await;
 		let _ = actors.db_pool.send(msg::Die.into()).await?.await;
 		Ok(())

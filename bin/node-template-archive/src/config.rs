@@ -18,6 +18,7 @@ use super::cli_opts::CliOpts;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use substrate_archive::KafkaConfig;
 use substrate_archive::MigrationConfig;
 
 #[derive(Clone)]
@@ -28,6 +29,7 @@ pub struct Config {
 	cache_size: Option<usize>,
 	block_workers: Option<usize>,
 	wasm_pages: Option<u64>,
+	kafka_list: Option<Vec<KafkaConfig>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -41,6 +43,7 @@ struct TomlConfig {
 	db_user: Option<String>,
 	db_pass: Option<String>,
 	db_name: Option<String>,
+	kafka: Option<Vec<KafkaConfig>>,
 }
 
 impl Config {
@@ -64,6 +67,7 @@ impl Config {
 			cache_size: toml_conf.cache_size,
 			block_workers: toml_conf.block_workers,
 			wasm_pages: toml_conf.wasm_pages,
+			kafka_list: toml_conf.kafka,
 		})
 	}
 
@@ -94,5 +98,9 @@ impl Config {
 
 	pub fn wasm_pages(&self) -> Option<u64> {
 		self.wasm_pages.clone()
+	}
+
+	pub fn kafka_list(&self) -> Option<Vec<KafkaConfig>> {
+		self.kafka_list.clone()
 	}
 }

@@ -32,6 +32,7 @@ pub fn main() -> Result<()> {
 			block_workers: config.block_workers(),
 			wasm_pages: config.wasm_pages(),
 			cache_size: config.cache_size(),
+			kafka_list: config.kafka_list(),
 			..ArchiveBuilder::default()
 		}
 		.chain_data_db(config.db_path().to_str().unwrap().to_string())
@@ -39,6 +40,7 @@ pub fn main() -> Result<()> {
 		.chain_spec(Box::new(config.cli().chain_spec.clone()))
 		.build()?;
 	archive.drive()?;
+
 	let running = Arc::new(AtomicBool::new(true));
 	let r = running.clone();
 

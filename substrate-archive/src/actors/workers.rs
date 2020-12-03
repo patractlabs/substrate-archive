@@ -16,6 +16,7 @@
 
 mod blocks;
 mod database;
+mod kafka_publish;
 mod metadata;
 mod storage_aggregator;
 
@@ -24,6 +25,7 @@ pub use self::database::*;
 pub use self::metadata::*;
 pub use blocks::*;
 pub use database::*;
+pub use kafka_publish::*;
 pub use storage_aggregator::*;
 
 use super::actor_pool::ActorPool;

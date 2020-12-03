@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with substrate-archive.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{actors::System, traits};
+use crate::{actors::System, kafka::KafkaConfig, traits};
 use sc_chain_spec::ChainSpec;
 use sc_client_api::backend as api_backend;
 use sc_executor::NativeExecutionDispatch;
@@ -52,6 +52,8 @@ pub struct Builder<B, R, D, DB> {
 	pub _marker: PhantomData<(B, R, D, DB)>,
 	/// maximimum amount of blocks to index at once
 	pub max_block_load: Option<u32>,
+	/// Kafak publish
+	pub kafka_list: Option<Vec<KafkaConfig>>,
 }
 
 impl<B, R, D, DB> Default for Builder<B, R, D, DB> {
@@ -65,6 +67,7 @@ impl<B, R, D, DB> Default for Builder<B, R, D, DB> {
 			chain_spec: None,
 			_marker: PhantomData,
 			max_block_load: None,
+			kafka_list: None,
 		}
 	}
 }
@@ -211,7 +214,14 @@ where
 		let backend = Arc::new(ReadOnlyBackend::new(db, true));
 		Self::startup_info(&*client, &*backend)?;
 
-		let ctx = System::<_, R, _, _>::new(client, backend, block_workers, pg_url.as_str(), max_block_load)?;
+		let ctx = System::<_, R, _, _>::new(
+			client,
+			backend,
+			block_workers,
+			pg_url.as_str(),
+			max_block_load,
+			self.kafka_list,
+		)?;
 		Ok(ctx)
 	}
 

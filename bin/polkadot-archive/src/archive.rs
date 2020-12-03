@@ -41,7 +41,7 @@ pub fn run_archive<D: ReadOnlyDB + 'static>(config: Config) -> Result<Box<dyn Ar
 	match last_path_part {
 		"polkadot" => db_path.push(format!("chains/{}/db", spec.id())),
 		"chains" => db_path.push(format!("{}/db", spec.id())),
-		_ => return Err(anyhow!("invalid path {}", db_path.as_path().display())),
+		_ => return Err(anyhow!("invalid path {} {}", db_path.as_path().display(), last_path_part)),
 	}
 
 	let db_path = db_path.as_path().to_str().context("could not convert rocksdb path to str")?.to_string();
