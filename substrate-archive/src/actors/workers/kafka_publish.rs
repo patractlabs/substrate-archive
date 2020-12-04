@@ -2,7 +2,7 @@ use crate::actors::msg::VecStorageWrap;
 use crate::database::StorageModel;
 use crate::kafka::{KafkaConfig, KafkaProducer};
 use serde_json::json;
-use serde_json::value::Value;
+use serde_json::value::Value as JsonValue;
 use sp_runtime::traits::{Block as BlockT, NumberFor};
 use std::marker::PhantomData;
 use substrate_archive_common::{types::Storage, Result};
@@ -24,7 +24,7 @@ impl<B: BlockT> KafkaPublishActor<B> {
 		log::info!("KafkaPublishActor init {}  producers", producers.len());
 		Ok(Self { producers: producers, _marker: PhantomData })
 	}
-	async fn send_all_produces(&self, messages: &Vec<Value>) {
+	async fn send_all_produces(&self, messages: &Vec<JsonValue>) {
 		if messages.len() > 0 {
 			for p in self.producers.iter() {
 				p.send(p.config().key.as_str(), json!({ "data": messages }).to_string().as_str()).await;
@@ -34,7 +34,7 @@ impl<B: BlockT> KafkaPublishActor<B> {
 	async fn batch_storage_handler(&self, storage: Vec<Storage<B>>) -> Result<()> {
 		let now = std::time::Instant::now();
 		let storage = Vec::<StorageModel<B>>::from(VecStorageWrap(storage));
-		let mut messages: Vec<Value> = vec![];
+		let mut messages: Vec<JsonValue> = vec![];
 
 		for record in storage.iter() {
 			let m = json!({

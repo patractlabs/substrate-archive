@@ -73,7 +73,7 @@ where
 				.iter_blocks(|n| fun(n))?
 				.enumerate()
 				.map(|(_, b)| {
-					log::info!("load block {}", (*b.block.header().number()).into());
+					log::debug!("load block {}", (*b.block.header().number()).into());
 					b
 				})
 				.collect())
@@ -132,6 +132,10 @@ where
 		if best > 0 {
 			max_to_collect = std::cmp::min(best, max_to_collect);
 			if best < start_to_collect {
+				let mut conn = self.db.send(GetState::Conn.into()).await?.await?.conn();
+				queries::delete_ahead_storages(best, &mut conn).await?;
+				log::info!("Delete ahead storages > {}  ", best);
+
 				start_to_collect = best - 1;
 			}
 		}

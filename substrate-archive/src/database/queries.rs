@@ -215,6 +215,11 @@ pub(crate) async fn get_all_blocks<B: BlockT + DeserializeOwned>(
 	}))
 }
 
+pub(crate) async fn delete_ahead_storages(block_num: u32, conn: &mut PgConnection) -> Result<()> {
+	sqlx::query("DELETE FROM storage where block_num > $1").bind(block_num).execute(conn).await?;
+	Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 	//! Must be connected to a postgres database
