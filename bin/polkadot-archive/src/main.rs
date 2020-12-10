@@ -28,6 +28,7 @@ pub fn main() -> Result<()> {
 
 	let mut archive = archive::run_archive::<SecondaryRocksDB>(config.clone())?;
 	archive.drive()?;
+
 	let running = Arc::new(AtomicBool::new(true));
 	let r = running.clone();
 

@@ -20,7 +20,7 @@ use crate::queries;
 use sp_runtime::traits::{Block as BlockT, NumberFor};
 use std::marker::PhantomData;
 use std::time::Duration;
-use substrate_archive_common::types::{BatchBlock, Metadata};
+use substrate_archive_common::types::{BatchBlock, BatchExtrinsic, Metadata};
 use substrate_archive_common::{
 	types::{Block, Storage},
 	Result,
@@ -42,7 +42,13 @@ impl<B: BlockT> DatabaseActor<B> {
 	pub fn with_db(db: Database) -> Self {
 		Self { db, _marker: PhantomData }
 	}
+	async fn batch_extrinsics_handler(&self, extrinsics: BatchExtrinsic<B>) -> Result<()> {
+		if extrinsics.inner.len() > 0 {
+			self.db.insert(extrinsics).await?;
+		}
 
+		Ok(())
+	}
 	async fn block_handler(&self, blk: Block<B>) -> Result<()>
 	where
 		NumberFor<B>: Into<u32>,
@@ -154,6 +160,18 @@ impl<B: BlockT> Handler<Metadata> for DatabaseActor<B> {
 		if let Err(e) = self.db.insert(meta).await {
 			log::error!("{}", e.to_string());
 		}
+	}
+}
+
+#[async_trait::async_trait]
+impl<B: BlockT> Handler<BatchExtrinsic<B>> for DatabaseActor<B> {
+	async fn handle(&mut self, extrinsics: BatchExtrinsic<B>, _ctx: &mut Context<Self>) {
+		let now = std::time::Instant::now();
+		let len = extrinsics.inner.len();
+		if let Err(e) = self.batch_extrinsics_handler(extrinsics).await {
+			log::error!("{}", e.to_string());
+		}
+		log::debug!("took {:?} to insert {} extrinsics", now.elapsed(), len);
 	}
 }
 

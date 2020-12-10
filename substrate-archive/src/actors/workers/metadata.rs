@@ -32,13 +32,21 @@ use xtra::prelude::*;
 pub struct Metadata<B: BlockT> {
 	conn: DbConn,
 	addr: Address<ActorPool<super::DatabaseActor<B>>>,
+	extrinsics: Address<super::ExtrinsicsActor<B>>,
 	meta: Meta<B>,
 }
 
-impl<B: BlockT + Unpin> Metadata<B> {
-	pub async fn new(addr: Address<ActorPool<super::DatabaseActor<B>>>, meta: Meta<B>) -> Result<Self> {
+impl<B: BlockT + Unpin> Metadata<B>
+where
+	B::Hash: Unpin,
+{
+	pub async fn new(
+		addr: Address<ActorPool<super::DatabaseActor<B>>>,
+		extrinsics: Address<super::ExtrinsicsActor<B>>,
+		meta: Meta<B>,
+	) -> Result<Self> {
 		let conn = addr.send(GetState::Conn.into()).await?.await?.conn();
-		Ok(Self { conn, addr, meta })
+		Ok(Self { conn, addr, extrinsics, meta })
 	}
 
 	// checks if the metadata exists in the database
@@ -61,7 +69,10 @@ impl<B: BlockT + Unpin> Metadata<B> {
 	{
 		let hash = blk.inner.block.header().hash();
 		self.meta_checker(blk.spec, hash).await?;
+
+		self.extrinsics.send(blk.clone()).await?;
 		self.addr.send(blk.into()).await?.await;
+
 		Ok(())
 	}
 
@@ -73,7 +84,9 @@ impl<B: BlockT + Unpin> Metadata<B> {
 		for b in versions.iter() {
 			self.meta_checker(b.spec, b.inner.block.hash()).await?;
 		}
+		self.extrinsics.send(blks.clone()).await?;
 		self.addr.send(blks.into()).await?;
+
 		Ok(())
 	}
 }
@@ -85,6 +98,7 @@ impl<B> Handler<Block<B>> for Metadata<B>
 where
 	B: BlockT + Unpin,
 	NumberFor<B>: Into<u32>,
+	B::Hash: Unpin,
 {
 	async fn handle(&mut self, blk: Block<B>, _: &mut Context<Self>) {
 		if let Err(e) = self.block_handler(blk).await {
@@ -98,6 +112,7 @@ impl<B> Handler<BatchBlock<B>> for Metadata<B>
 where
 	B: BlockT + Unpin,
 	NumberFor<B>: Into<u32>,
+	B::Hash: Unpin,
 {
 	async fn handle(&mut self, blks: BatchBlock<B>, _: &mut Context<Self>) {
 		if let Err(e) = self.batch_block_handler(blks).await {

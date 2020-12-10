@@ -62,6 +62,7 @@ tempfile = "3.1.0"
 async-executor = "0.1.2"
 arc-swap = "0.4.7"
 rdkafka = { version = "0.24", features = ["cmake-build"] }
+polkadot-runtime = { package = "polkadot-runtime", git = "https://github.com/paritytech/polkadot", branch = "master" }
 
 # Workspace
 substrate-archive-backend = { path = '../substrate-archive-backend' }

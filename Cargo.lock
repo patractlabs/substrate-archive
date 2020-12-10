@@ -7962,6 +7962,7 @@ dependencies = [
  "parity-scale-codec",
  "parity-util-mem",
  "parking_lot 0.10.2",
+ "polkadot-runtime",
  "polkadot-service",
  "pretty_env_logger",
  "primitive-types",

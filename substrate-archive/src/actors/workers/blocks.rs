@@ -19,6 +19,7 @@ use sp_runtime::{
 	generic::SignedBlock,
 	traits::{Block as BlockT, Header as _, NumberFor, Zero},
 };
+
 use std::sync::Arc;
 use substrate_archive_backend::{ReadOnlyBackend, RuntimeVersionCache};
 use substrate_archive_common::{
@@ -69,14 +70,7 @@ where
 		let backend = self.backend.clone();
 		let now = std::time::Instant::now();
 		let gather_blocks = move || -> Result<Vec<SignedBlock<B>>> {
-			Ok(backend
-				.iter_blocks(|n| fun(n))?
-				.enumerate()
-				.map(|(_, b)| {
-					log::debug!("load block {}", (*b.block.header().number()).into());
-					b
-				})
-				.collect())
+			Ok(backend.iter_blocks(|n| fun(n))?.enumerate().map(|(_, b)| b).collect())
 		};
 		let blocks = smol::unblock!(gather_blocks())?;
 		log::info!("Took {:?} to load {} blocks", now.elapsed(), blocks.len());
@@ -133,7 +127,7 @@ where
 			max_to_collect = std::cmp::min(best, max_to_collect);
 			if best < start_to_collect {
 				let mut conn = self.db.send(GetState::Conn.into()).await?.await?.conn();
-				queries::delete_ahead_storages(best, &mut conn).await?;
+				queries::delete_ahead(best, &mut conn).await?;
 				log::info!("Delete ahead storages > {}  ", best);
 
 				start_to_collect = best - 1;
@@ -169,6 +163,7 @@ where
 }
 
 struct Crawl;
+
 impl Message for Crawl {
 	type Result = ();
 }
@@ -192,6 +187,7 @@ where
 }
 
 struct ReIndex;
+
 impl Message for ReIndex {
 	type Result = ();
 }

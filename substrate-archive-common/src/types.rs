@@ -20,6 +20,49 @@ use sp_runtime::{generic::SignedBlock, traits::Block as BlockT};
 use sp_storage::{StorageData, StorageKey};
 
 #[derive(Encode, Decode, Debug, Clone)]
+pub struct Extrinsic<B: BlockT> {
+	pub hash: B::Hash,
+	pub block_num: u32,
+	pub index: u32,
+	pub address: Vec<u8>,
+	pub signature: Vec<u8>,
+	pub extra: Vec<u8>,
+	pub function: Vec<u8>,
+}
+
+impl<B: BlockT> Extrinsic<B> {
+	pub fn new_signed(
+		hash: B::Hash,
+		block_num: u32,
+		index: u32,
+		address: Vec<u8>,
+		signature: Vec<u8>,
+		extra: Vec<u8>,
+		function: Vec<u8>,
+	) -> Self {
+		Self { hash, block_num, index, address, signature, extra, function }
+	}
+	pub fn new_unsigned(hash: B::Hash, block_num: u32, index: u32, call: Vec<u8>) -> Self {
+		Self { hash, block_num, index, address: vec![], signature: vec![], extra: vec![], function: call }
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct BatchExtrinsic<B: BlockT> {
+	pub inner: Vec<Extrinsic<B>>,
+}
+
+impl<B: BlockT> BatchExtrinsic<B> {
+	pub fn new(extrinsics: Vec<Extrinsic<B>>) -> Self {
+		Self { inner: extrinsics }
+	}
+
+	pub fn inner(&self) -> &Vec<Extrinsic<B>> {
+		&self.inner
+	}
+}
+
+#[derive(Encode, Decode, Debug, Clone)]
 pub struct Block<B: BlockT> {
 	pub inner: SignedBlock<B>,
 	pub spec: u32,
@@ -52,7 +95,7 @@ impl Metadata {
 }
 
 /// NewType for committing many blocks to the database at once
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BatchBlock<B: BlockT> {
 	pub inner: Vec<Block<B>>,
 }

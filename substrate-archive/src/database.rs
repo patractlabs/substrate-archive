@@ -186,6 +186,58 @@ where
 }
 
 #[async_trait]
+impl<B: BlockT> Insert for BatchExtrinsic<B> {
+	async fn insert(mut self, conn: &mut DbConn) -> DbReturn {
+		let mut batch = Batch::new(
+			"extrinsics",
+			r#"
+            INSERT INTO "extrinsics" (
+                hash, block_num, index, address, signature, extra, fun
+            ) VALUES
+            "#,
+			r#"
+            ON CONFLICT (block_num,index) DO UPDATE SET
+                hash = EXCLUDED.hash,
+                address = EXCLUDED.address,
+                signature = EXCLUDED.signature,
+                extra = EXCLUDED.extra,
+                fun = EXCLUDED.fun
+            "#,
+		);
+		for e in self.inner.into_iter() {
+			batch.reserve(8)?;
+			if batch.current_num_arguments() > 0 {
+				batch.append(",");
+			}
+
+			let hash = e.hash.as_ref();
+			let block_num: u32 = e.block_num;
+			let index = e.index;
+			let address = e.address;
+			let signature = e.signature;
+			let extra = e.extra;
+			let fun = e.function;
+			batch.append("(");
+			batch.bind(hash)?;
+			batch.append(",");
+			batch.bind(block_num)?;
+			batch.append(",");
+			batch.bind(index)?;
+			batch.append(",");
+			batch.bind(address)?;
+			batch.append(",");
+			batch.bind(signature)?;
+			batch.append(",");
+			batch.bind(extra)?;
+			batch.append(",");
+			batch.bind(fun)?;
+			batch.append(")");
+		}
+		Ok(batch.execute(conn).await?)
+	}
+}
+
+#[async_trait]
 impl<B: BlockT> Insert for StorageModel<B> {
 	async fn insert(mut self, conn: &mut DbConn) -> DbReturn {
 		log::info!("Inserting Single Storage");
