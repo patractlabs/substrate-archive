@@ -34,6 +34,9 @@ tracing = "0.1.23"
 tracing-subscriber = "0.2.15"
 xtra = { version = "0.5.0-rc.1", features = ["with-smol-1"] }
 
+# Kafka Support
+rdkafka = { version = "0.25", features = ["cmake-build"], optional = true }
+
 # Parity
 codec = { package = "parity-scale-codec", version = "1.3", default-features = false, features = ["derive", "full"] }
 
@@ -47,8 +50,8 @@ sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "mas
 sp-block-builder = { git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "master" }
+sp-storage = { git = "https://github.com/paritytech/substrate", branch = "master" }
 sp-tracing = { git ="https://github.com/paritytech/substrate", branch = "master" }
-sp-storage = { git ="https://github.com/paritytech/substrate", branch = "master" }
 
 # Workspace
 substrate-archive-backend = { path = '../substrate-archive-backend' }
@@ -62,3 +65,6 @@ bincode = "1.3"
 tempfile = "3.2"
 once_cell = "1.7.2"
 dotenv = "0.15.0"
+
+[features]
+kafka = ["rdkafka"]

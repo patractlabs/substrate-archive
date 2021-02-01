@@ -36,10 +36,14 @@ use sp_runtime::traits::{Block as BlockT, Header as _, NumberFor};
 use substrate_archive_backend::{ApiAccess, Meta, ReadOnlyBackend, ReadOnlyDB};
 
 use self::workers::GetState;
+#[cfg(feature = "kafka")]
+pub use self::workers::KafkaActor;
 pub use self::{
 	actor_pool::ActorPool,
 	workers::{BlocksIndexer, DatabaseActor, StorageAggregator},
 };
+#[cfg(feature = "kafka")]
+use crate::kafka::KafkaConfig;
 use crate::{
 	archive::Archive,
 	database::{models::BlockModelDecoder, queries, Channel, Listener},
@@ -62,6 +66,8 @@ where
 	pub meta: Meta<B>,
 	pub control: ControlConfig,
 	pub tracing_targets: Option<String>,
+	#[cfg(feature = "kafka")]
+	pub kafka: Option<KafkaConfig>,
 }
 
 impl<B: BlockT + Unpin, D: ReadOnlyDB> Clone for SystemConfig<B, D>
@@ -75,6 +81,8 @@ where
 			meta: self.meta.clone(),
 			control: self.control,
 			tracing_targets: self.tracing_targets.clone(),
+			#[cfg(feature = "kafka")]
+			kafka: self.kafka.clone(),
 		}
 	}
 }
@@ -135,6 +143,7 @@ impl<B: BlockT + Unpin, D: ReadOnlyDB> SystemConfig<B, D>
 where
 	B::Hash: Unpin,
 {
+	#[cfg(not(feature = "kafka"))]
 	pub fn new(
 		backend: Arc<ReadOnlyBackend<B, D>>,
 		pg_url: String,
@@ -143,6 +152,18 @@ where
 		tracing_targets: Option<String>,
 	) -> Self {
 		Self { backend, pg_url, meta, control, tracing_targets }
+	}
+
+	#[cfg(feature = "kafka")]
+	pub fn new(
+		backend: Arc<ReadOnlyBackend<B, D>>,
+		pg_url: String,
+		meta: Meta<B>,
+		control: ControlConfig,
+		tracing_targets: Option<String>,
+		kafka: Option<KafkaConfig>,
+	) -> Self {
+		Self { backend, pg_url, meta, control, tracing_targets, kafka }
 	}
 
 	pub fn backend(&self) -> &Arc<ReadOnlyBackend<B, D>> {
@@ -167,6 +188,8 @@ where
 	blocks: Address<workers::BlocksIndexer<B, D>>,
 	metadata: Address<workers::MetadataActor<B>>,
 	db_pool: Address<ActorPool<DatabaseActor<B>>>,
+	#[cfg(feature = "kafka")]
+	kafka: Option<Address<workers::KafkaActor<B>>>,
 }
 
 /// Control the execution of the indexing engine.
@@ -246,10 +269,19 @@ where
 		let listener = Self::init_listeners(conf.pg_url()).await?;
 		let mut conn = pool.acquire().await?;
 		Self::restore_missing_storage(&mut *conn).await?;
+		#[cfg(not(feature = "kafka"))]
 		let env = Environment::<B, R, C, D>::new(
 			conf.backend().clone(),
 			client,
 			actors.storage.clone(),
+			conf.tracing_targets.clone(),
+		);
+		#[cfg(feature = "kafka")]
+		let env = Environment::<B, R, C, D>::new(
+			conf.backend().clone(),
+			client,
+			actors.storage.clone(),
+			actors.kafka.clone(),
 			conf.tracing_targets.clone(),
 		);
 		let env = AssertUnwindSafe(env);
@@ -284,6 +316,7 @@ where
 		Ok(())
 	}
 
+	#[cfg(not(feature = "kafka"))]
 	async fn spawn_actors(conf: SystemConfig<B, D>) -> Result<Actors<B, D>> {
 		let db = workers::DatabaseActor::<B>::new(conf.pg_url().into()).await?;
 		let db_pool =
@@ -299,6 +332,22 @@ where
 		Ok(Actors { storage, blocks, metadata, db_pool })
 	}
 
+	#[cfg(feature = "kafka")]
+	async fn spawn_actors(conf: SystemConfig<B, D>) -> Result<Actors<B, D>> {
+		let db = workers::DatabaseActor::<B>::new(conf.pg_url().into()).await?;
+		let db_pool = actor_pool::ActorPool::new(db, 4).create(None).spawn(&mut Smol::Global);
+		let kafka =
+			conf.kafka.clone().map(|config| workers::KafkaActor::new(config).create(None).spawn(&mut Smol::Global));
+		let storage = workers::StorageAggregator::new(db_pool.clone()).create(None).spawn(&mut Smol::Global);
+		let metadata = workers::MetadataActor::new(db_pool.clone(), conf.meta().clone(), kafka.clone())
+			.await?
+			.create(None)
+			.spawn(&mut Smol::Global);
+		let blocks =
+			workers::BlocksIndexer::new(&conf, db_pool.clone(), metadata.clone()).create(None).spawn(&mut Smol::Global);
+		Ok(Actors { storage, blocks, metadata, db_pool, kafka })
+	}
+
 	async fn kill_actors(actors: Actors<B, D>) -> Result<()> {
 		let fut: Vec<BoxFuture<'_, Result<(), Disconnected>>> = vec![
 			Box::pin(actors.storage.send(Die)),
@@ -307,6 +356,10 @@ where
 		];
 		futures::future::join_all(fut).await;
 		let _ = actors.db_pool.send(Die.into()).await?.await;
+		#[cfg(feature = "kafka")]
+		if let Some(kafka) = actors.kafka {
+			kafka.send(Die).await?
+		}
 		Ok(())
 	}
 

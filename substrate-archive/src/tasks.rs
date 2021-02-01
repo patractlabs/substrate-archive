@@ -33,6 +33,8 @@ use sp_runtime::{
 
 use substrate_archive_backend::{ApiAccess, ReadOnlyBackend as Backend, ReadOnlyDB};
 
+#[cfg(feature = "kafka")]
+use crate::{actors::KafkaActor, kafka::KafkaBlockValue};
 use crate::{
 	actors::StorageAggregator,
 	error::{ArchiveError, TracingError},
@@ -54,6 +56,8 @@ where
 	backend: Arc<Backend<B, D>>,
 	client: Arc<C>,
 	storage: Address<StorageAggregator<B>>,
+	#[cfg(feature = "kafka")]
+	kafka: Option<Address<KafkaActor<B>>>,
 	_marker: PhantomData<R>,
 }
 
@@ -64,6 +68,7 @@ where
 	B: BlockT + Unpin,
 	B::Hash: Unpin,
 {
+	#[cfg(not(feature = "kafka"))]
 	pub fn new(
 		backend: Arc<Backend<B, D>>,
 		client: Arc<C>,
@@ -71,6 +76,17 @@ where
 		tracing_targets: Option<String>,
 	) -> Self {
 		Self { backend, client, storage, tracing_targets, _marker: PhantomData }
+	}
+
+	#[cfg(feature = "kafka")]
+	pub fn new(
+		backend: Arc<Backend<B, D>>,
+		client: Arc<C>,
+		storage: Address<StorageAggregator<B>>,
+		kafka: Option<Address<KafkaActor<B>>>,
+		tracing_targets: Option<String>,
+	) -> Self {
+		Self { backend, client, storage, kafka, tracing_targets, _marker: PhantomData }
 	}
 }
 
@@ -173,7 +189,7 @@ where
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct TaskExecutor;
 
 impl futures::task::Spawn for TaskExecutor {
@@ -223,15 +239,12 @@ where
 
 	let hash = block.header().hash();
 	let number = *block.header().number();
+	let spec = env.client.runtime_version_at(&BlockId::Hash(hash)).map_err(|e| format!("{:?}", e))?.spec_version;
+	log::debug!("Executing Block: {}:{}, version {}", hash, number, spec);
 
-	log::debug!(
-		"Executing Block: {}:{}, version {}",
-		block.header().hash(),
-		block.header().number(),
-		env.client.runtime_version_at(&BlockId::Hash(block.hash())).map_err(|e| format!("{:?}", e))?.spec_version,
-	);
 	let span_events = Arc::new(Mutex::new(SpansAndEvents { spans: Vec::new(), events: Vec::new() }));
 
+	#[cfg(not(feature = "kafka"))]
 	let storage = {
 		// storage scope
 		let handler = env
@@ -244,8 +257,24 @@ where
 		let now = std::time::Instant::now();
 		let block = BlockExecutor::new(api, &env.backend, block).block_into_storage()?;
 		log::debug!("Took {:?} to execute block", now.elapsed());
-
 		Storage::from(block)
+	};
+	#[cfg(feature = "kafka")]
+	let (storage, kafka_block) = {
+		// storage scope
+		let handler = env
+			.tracing_targets
+			.as_ref()
+			.map(|t| TraceHandler::new(&t, number.into(), hash.as_ref().to_vec(), span_events.clone()));
+
+		let _guard = handler.map(tracing::subscriber::set_default);
+
+		let now = std::time::Instant::now();
+		let changes = BlockExecutor::new(api, &env.backend, block.clone()).block_into_storage()?;
+		log::debug!("Took {:?} to execute block", now.elapsed());
+		let storage = Storage::from(changes);
+		let kafka_block = KafkaBlockValue::from(block, spec, storage.is_full(), storage.changes.clone());
+		(storage, kafka_block)
 	};
 
 	// We destroy the Arc and transform the Mutex here in order to avoid additional allocation.
@@ -259,6 +288,10 @@ where
 	if !traces.events.is_empty() || !traces.spans.is_empty() {
 		let traces = Traces::new(number.into(), hash.as_ref().to_vec(), traces.events, traces.spans);
 		smol::block_on(env.storage.send(traces))?;
+	}
+	#[cfg(feature = "kafka")]
+	if let Some(ref kafka) = env.kafka {
+		smol::block_on(kafka.send(kafka_block))?;
 	}
 	log::trace!("Took {:?} to insert & send finished task", now.elapsed());
 	Ok(())

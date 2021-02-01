@@ -16,12 +16,19 @@
 use itertools::Itertools;
 use xtra::prelude::*;
 
+#[cfg(feature = "kafka")]
+use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
 	generic::BlockId,
 	traits::{Block as BlockT, NumberFor},
 };
 use substrate_archive_backend::Meta;
 
+#[cfg(feature = "kafka")]
+use crate::{
+	actors::workers::KafkaActor,
+	kafka::{KafkaBlockValue, KafkaMetadataValue},
+};
 use crate::{
 	actors::{
 		actor_pool::ActorPool,
@@ -38,8 +45,11 @@ pub struct MetadataActor<B: BlockT> {
 	conn: DbConn,
 	addr: Address<ActorPool<DatabaseActor<B>>>,
 	meta: Meta<B>,
+	#[cfg(feature = "kafka")]
+	kafka: Option<Address<KafkaActor<B>>>,
 }
 
+#[cfg(not(feature = "kafka"))]
 impl<B: BlockT + Unpin> MetadataActor<B> {
 	pub async fn new(addr: Address<ActorPool<DatabaseActor<B>>>, meta: Meta<B>) -> Result<Self> {
 		let conn = addr.send(GetState::Conn.into()).await?.await?.conn();
@@ -55,7 +65,7 @@ impl<B: BlockT + Unpin> MetadataActor<B> {
 			let meta = smol::unblock(move || meta.metadata(&BlockId::hash(hash))).await?;
 			let meta: sp_core::Bytes = meta.into();
 			let meta = Metadata::new(ver, meta.0);
-			self.addr.send(meta.into()).await?.await;
+			self.addr.send(meta.clone().into()).await?.await;
 		}
 		Ok(())
 	}
@@ -66,7 +76,7 @@ impl<B: BlockT + Unpin> MetadataActor<B> {
 	{
 		let hash = blk.inner.block.hash();
 		self.meta_checker(blk.spec, hash).await?;
-		self.addr.send(blk.into()).await?.await;
+		self.addr.send(blk.clone().into()).await?.await;
 		Ok(())
 	}
 
@@ -77,7 +87,74 @@ impl<B: BlockT + Unpin> MetadataActor<B> {
 		for blk in blks.inner().iter().unique_by(|&blk| blk.spec) {
 			self.meta_checker(blk.spec, blk.inner.block.hash()).await?;
 		}
-		self.addr.send(blks.into()).await?.await;
+		self.addr.send(blks.clone().into()).await?.await;
+		Ok(())
+	}
+}
+
+#[cfg(feature = "kafka")]
+impl<B: BlockT + Unpin> MetadataActor<B> {
+	pub async fn new(
+		addr: Address<ActorPool<DatabaseActor<B>>>,
+		meta: Meta<B>,
+		kafka: Option<Address<KafkaActor<B>>>,
+	) -> Result<Self> {
+		let conn = addr.send(GetState::Conn.into()).await?.await?.conn();
+		Ok(Self { conn, addr, meta, kafka })
+	}
+
+	// checks if the metadata exists in the database
+	// if it doesn't exist yet, fetch metadata and insert it
+	async fn meta_checker(
+		&mut self,
+		ver: u32,
+		hash: B::Hash,
+		block_num: <<B as BlockT>::Header as HeaderT>::Number,
+	) -> Result<()> {
+		if !queries::check_if_meta_exists(ver, &mut self.conn).await? {
+			let meta = self.meta.clone();
+			log::info!("Getting metadata for hash {}, version {}", hex::encode(hash.as_ref()), ver);
+			let meta = smol::unblock(move || meta.metadata(&BlockId::hash(hash))).await?;
+			let meta: sp_core::Bytes = meta.into();
+			let meta = Metadata::new(ver, meta.0);
+			self.addr.send(meta.clone().into()).await?.await;
+			#[cfg(feature = "kafka")]
+			if let Some(kafka) = &self.kafka {
+				kafka.send(KafkaMetadataValue::from(meta, block_num, hash)).await?;
+			}
+		}
+		Ok(())
+	}
+
+	async fn block_handler(&mut self, blk: Block<B>) -> Result<()>
+	where
+		NumberFor<B>: Into<u32>,
+	{
+		let hash = blk.inner.block.hash();
+		let block_num = *blk.inner.block.header().number();
+		self.meta_checker(blk.spec, hash, block_num).await?;
+		self.addr.send(blk.clone().into()).await?.await;
+		#[cfg(feature = "kafka")]
+		{
+			let block_num: u32 = block_num.into();
+			if block_num == 0 {
+				if let Some(kafka) = &self.kafka {
+					kafka.send(KafkaBlockValue::from(blk.inner.block, blk.spec, false, vec![])).await?;
+				}
+			}
+		}
+		Ok(())
+	}
+
+	async fn batch_block_handler(&mut self, blks: BatchBlock<B>) -> Result<()>
+	where
+		NumberFor<B>: Into<u32>,
+	{
+		for blk in blks.inner().iter().unique_by(|&blk| blk.spec) {
+			let block_num = *blk.inner.block.header().number();
+			self.meta_checker(blk.spec, blk.inner.block.hash(), block_num).await?;
+		}
+		self.addr.send(blks.clone().into()).await?.await;
 		Ok(())
 	}
 }

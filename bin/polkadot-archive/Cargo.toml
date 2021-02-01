@@ -17,4 +17,4 @@ toml = "0.5"
 sp-io = { git = "https://github.com/paritytech/substrate", branch = "master" }
 polkadot-service = { git = "https://github.com/paritytech/polkadot", branch = "master" }
 
-substrate-archive = { path = "../../substrate-archive" }
+substrate-archive = { path = "../../substrate-archive", features = ["kafka"] }
