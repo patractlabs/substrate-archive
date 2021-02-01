@@ -833,6 +833,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "coil"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1228,6 +1237,17 @@ name = "data-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993a608597367c6377b258c25d7120740f00ed23a2252b729b1932dd7866f908"
+
+[[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.60",
+]
 
 [[package]]
 name = "derive_more"
@@ -3296,6 +3316,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "602113192b08db8f38796c4e85c39e960c145965140e918018bcde1952429655"
 dependencies = [
  "cc",
+ "libc",
  "pkg-config",
  "vcpkg",
 ]
@@ -3853,6 +3874,28 @@ checksum = "05499f3756671c15885fee9034446956fff3f243d6077b91e5767df161f766b3"
 dependencies = [
  "hermit-abi",
  "libc",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "226b45a5c2ac4dd696ed30fa6b94b057ad909c7b7fc2e0d0808192bced894066"
+dependencies = [
+ "derivative",
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c0fd9eba1d5db0994a239e09c1be402d35622277e35468ba891aa5e3188ce7e"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.60",
 ]
 
 [[package]]
@@ -5761,6 +5804,36 @@ dependencies = [
  "crossbeam-utils 0.8.1",
  "lazy_static",
  "num_cpus",
+]
+
+[[package]]
+name = "rdkafka"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8acd8f5c5482fdf89e8878227bafa442d8c4409f6287391c85549ca83626c27"
+dependencies = [
+ "futures 0.3.12",
+ "libc",
+ "log",
+ "rdkafka-sys",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "slab",
+ "tokio 1.2.0",
+]
+
+[[package]]
+name = "rdkafka-sys"
+version = "3.0.0+1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca35e95c88e08cdc643b25744e38ccee7c93c7e90d1ac6850fe74cbaa40803c3"
+dependencies = [
+ "cmake",
+ "libc",
+ "libz-sys",
+ "num_enum",
+ "pkg-config",
 ]
 
 [[package]]
@@ -8414,6 +8487,7 @@ dependencies = [
  "num_cpus",
  "parity-scale-codec",
  "parking_lot 0.11.1",
+ "rdkafka",
  "rmp-serde 0.15.1",
  "sc-chain-spec",
  "sc-client-api",
@@ -8790,6 +8864,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8190d04c665ea9e6b6a0dc45523ade572c088d2e6566244c1122671dbf4ae3a"
+dependencies = [
+ "autocfg",
+ "pin-project-lite 0.2.4",
+]
+
+[[package]]
 name = "tokio-buf"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9023,9 +9107,9 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tracing"
-version = "0.1.24"
+version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77d3842f76ca899ff2dbcf231c5c65813dea431301d6eb686279c15c4464f12"
+checksum = "f7d40a22fd029e33300d8d89a5cc8ffce18bb7c587662f54629e94c9de5487f3"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
@@ -9036,9 +9120,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.13"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8a9bd1db7706f2373a190b0d067146caa39350c486f3d455b0e33b431f94c07"
+checksum = "43f080ea7e4107844ef4766459426fa2d5c1ada2e47edba05dc7fa99d9629f47"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",

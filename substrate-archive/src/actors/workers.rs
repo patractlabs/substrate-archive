@@ -16,10 +16,14 @@
 
 mod blocks;
 mod database;
+#[cfg(feature = "kafka")]
+mod kafka;
 mod metadata;
 mod storage_aggregator;
 
+pub use self::blocks::BlocksIndexer;
 pub use self::database::{DatabaseActor, GetState};
+#[cfg(feature = "kafka")]
+pub use self::kafka::KafkaActor;
 pub use self::metadata::MetadataActor;
-pub use blocks::BlocksIndexer;
-pub use storage_aggregator::StorageAggregator;
+pub use self::storage_aggregator::StorageAggregator;

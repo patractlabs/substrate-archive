@@ -27,6 +27,8 @@ mod actors;
 pub mod archive;
 mod database;
 mod error;
+#[cfg(feature = "kafka")]
+mod kafka;
 mod logger;
 mod tasks;
 mod types;
@@ -36,6 +38,8 @@ pub use self::actors::{ControlConfig, System};
 pub use self::archive::{Archive, ArchiveBuilder, ArchiveConfig, ChainConfig, TracingConfig};
 pub use self::database::{queries, DatabaseConfig};
 pub use self::error::ArchiveError;
+#[cfg(feature = "kafka")]
+pub use self::kafka::KafkaConfig;
 
 pub mod chain_traits {
 	//! Traits defining functions on the client needed for indexing

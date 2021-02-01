@@ -72,6 +72,11 @@ pub enum ArchiveError {
 
 	#[error("Rust Standard Library does not support negative durations")]
 	TimestampOutOfRange,
+
+	/// Kafka producer error.
+	#[cfg(feature = "kafka")]
+	#[error(transparent)]
+	Kafka(#[from] rdkafka::error::KafkaError),
 }
 
 #[derive(Error, Debug)]

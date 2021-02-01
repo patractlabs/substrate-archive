@@ -33,6 +33,8 @@ use substrate_archive_backend::{
 	runtime_api, ExecutionMethod, ReadOnlyBackend, ReadOnlyDB, RuntimeConfig, TArchiveClient,
 };
 
+#[cfg(feature = "kafka")]
+use crate::kafka::KafkaConfig;
 use crate::{
 	actors::{ControlConfig, System, SystemConfig},
 	database::{self, DatabaseConfig},
@@ -107,6 +109,8 @@ pub struct ArchiveConfig {
 	/// Enable state tracing while also specifying the targets
 	/// and directory where the WASM runtimes are stored.
 	pub wasm_tracing: Option<TracingConfig>,
+	#[cfg(feature = "kafka")]
+	pub kafka: Option<KafkaConfig>,
 }
 
 /// The control interface of an archive system.
@@ -333,6 +337,13 @@ impl<B, R, D, DB> ArchiveBuilder<B, R, D, DB> {
 		self.config.wasm_tracing = wasm_tracing;
 		self
 	}
+
+	/// Set the kafka configuration.
+	#[cfg(feature = "kafka")]
+	pub fn kafka_config(mut self, kafka: Option<KafkaConfig>) -> Self {
+		self.config.kafka = kafka;
+		self
+	}
 }
 
 impl<B, R, D, DB> ArchiveBuilder<B, R, D, DB>
@@ -392,12 +403,22 @@ where
 		smol::block_on(database::migrate(&pg_url))?;
 
 		// config actor system
+		#[cfg(not(feature = "kafka"))]
 		let config = SystemConfig::new(
 			backend,
 			pg_url,
 			client.clone(),
 			self.config.control,
 			self.config.wasm_tracing.map(|t| t.targets),
+		);
+		#[cfg(feature = "kafka")]
+		let config = SystemConfig::new(
+			backend,
+			pg_url,
+			client.clone(),
+			self.config.control,
+			self.config.wasm_tracing.map(|t| t.targets),
+			self.config.kafka,
 		);
 		let sys = System::<_, R, _, _>::new(client, config)?;
 		Ok(sys)

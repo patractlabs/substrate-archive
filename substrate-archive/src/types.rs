@@ -21,7 +21,7 @@ use xtra::Message;
 use sp_runtime::{generic::SignedBlock, traits::Block as BlockT};
 use sp_storage::{StorageData, StorageKey};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Metadata {
 	version: u32,
 	meta: Vec<u8>,
@@ -62,7 +62,7 @@ impl<B: BlockT> Message for Block<B> {
 }
 
 /// NewType for committing many blocks to the database at once
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BatchBlock<B: BlockT> {
 	pub inner: Vec<Block<B>>,
 }
@@ -121,7 +121,7 @@ impl<Block: BlockT> Message for Storage<Block> {
 	type Result = ();
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BatchStorage<B: BlockT> {
 	pub inner: Vec<Storage<B>>,
 }
