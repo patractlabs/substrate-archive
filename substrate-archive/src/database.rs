@@ -130,7 +130,14 @@ where
 		let query = sqlx::query(
 			r#"
             INSERT INTO blocks (parent_hash, hash, block_num, state_root, extrinsics_root, digest, ext, spec) VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (block_num) DO UPDATE SET
+            	parent_hash=EXCLUDED.parent_hash,
+            	hash=EXCLUDED.hash,
+            	state_root=EXCLUDED.state_root,
+            	extrinsics_root=EXCLUDED.extrinsics_root,
+            	digest=EXCLUDED.digest,
+            	ext=EXCLUDED.ext,
+            	spec=EXCLUDED.spec
         "#,
 		);
 		let parent_hash = self.inner.block.header().parent_hash().as_ref();
@@ -172,7 +179,14 @@ where
             ) VALUES
             "#,
 			r#"
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (block_num) DO UPDATE SET
+            	parent_hash=EXCLUDED.parent_hash,
+            	hash=EXCLUDED.hash,
+            	state_root=EXCLUDED.state_root,
+            	extrinsics_root=EXCLUDED.extrinsics_root,
+            	digest=EXCLUDED.digest,
+            	ext=EXCLUDED.ext,
+            	spec=EXCLUDED.spec
             "#,
 		);
 		for b in self.inner {
