@@ -134,8 +134,7 @@ where
 struct BlockExecutor<'a, Block, Api, B>
 where
 	Block: BlockT,
-	Api: BlockBuilderApi<Block, Error = sp_blockchain::Error>
-		+ ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>>,
+	Api: BlockBuilderApi<Block> + ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>>,
 	B: backend::Backend<Block>,
 {
 	api: ApiRef<'a, Api>,
@@ -147,8 +146,7 @@ where
 impl<'a, Block, Api, B> BlockExecutor<'a, Block, Api, B>
 where
 	Block: BlockT,
-	Api: BlockBuilderApi<Block, Error = sp_blockchain::Error>
-		+ ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>>,
+	Api: BlockBuilderApi<Block> + ApiExt<Block, StateBackend = backend::StateBackendFor<B, Block>>,
 	B: backend::Backend<Block>,
 {
 	fn new(api: ApiRef<'a, Api>, backend: &'a Arc<B>, block: Block) -> Self {
@@ -176,7 +174,7 @@ where
 		header.digest_mut().pop();
 		let block = Block::new(header, ext);
 
-		self.api.execute_block(&self.id, block)?;
+		self.api.execute_block(&self.id, block).map_err(|err| ArchiveError::Backend(err.into()))?;
 		let storage_changes =
 			self.api.into_storage_changes(&state, None, parent_hash).map_err(ArchiveError::ConvertStorageChanges)?;
 
@@ -227,8 +225,7 @@ where
 	NumberFor<B>: Into<u32>,
 	B::Hash: Unpin,
 	RA: ConstructRuntimeApi<B, Api> + Send + Sync + 'static,
-	RA::RuntimeApi: BlockBuilderApi<B, Error = sp_blockchain::Error>
-		+ ApiExt<B, StateBackend = backend::StateBackendFor<Backend<B, D>, B>>,
+	RA::RuntimeApi: BlockBuilderApi<B> + ApiExt<B, StateBackend = backend::StateBackendFor<Backend<B, D>, B>>,
 	Api: ApiAccess<B, Backend<B, D>, RA> + 'static,
 {
 	let api = env.client.runtime_api();

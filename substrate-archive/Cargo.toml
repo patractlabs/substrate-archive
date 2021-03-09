@@ -38,7 +38,7 @@ xtra = { version = "0.5.0-rc.1", features = ["with-smol-1"] }
 rdkafka = { version = "0.25", features = ["cmake-build"], optional = true }
 
 # Parity
-codec = { package = "parity-scale-codec", version = "1.3", default-features = false, features = ["derive", "full"] }
+codec = { package = "parity-scale-codec", version = "2.0", default-features = false, features = ["derive", "full"] }
 
 # Substrate is pinned to the latest substrate version that polkadot release v0.8.25 is
 # using. This is necessary to make substrate-archive compatible with the polkadot runtime.
@@ -57,7 +57,6 @@ sp-tracing = { git ="https://github.com/paritytech/substrate", branch = "master"
 substrate-archive-backend = { path = '../substrate-archive-backend' }
 
 [dev-dependencies]
-polkadot-service = { package = "polkadot-service", git = "https://github.com/paritytech/polkadot", branch = "master" }
 pretty_env_logger = "0.4.0"
 # used in tests for storing test data on disk
 flate2 = "1.0"

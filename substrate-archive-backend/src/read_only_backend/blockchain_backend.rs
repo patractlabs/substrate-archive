@@ -94,6 +94,10 @@ impl<Block: BlockT, D: ReadOnlyDB> BlockchainBackend<Block> for ReadOnlyBackend<
 	) -> ChainResult<Option<Block::Hash>> {
 		Ok(None)
 	}
+
+	fn extrinsic(&self, _hash: &<Block as BlockT>::Hash) -> ChainResult<Option<<Block as BlockT>::Extrinsic>> {
+		unimplemented!()
+	}
 }
 
 impl<Block: BlockT, D: ReadOnlyDB> HeaderBackend<Block> for ReadOnlyBackend<Block, D> {

@@ -45,6 +45,12 @@ impl From<sp_blockchain::Error> for BackendError {
 	}
 }
 
+impl From<sp_api::ApiError> for BackendError {
+	fn from(e: sp_api::ApiError) -> Self {
+		Self::Blockchain(e.to_string())
+	}
+}
+
 impl From<&str> for BackendError {
 	fn from(e: &str) -> Self {
 		Self::Msg(e.to_string())

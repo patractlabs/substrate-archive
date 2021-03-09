@@ -37,7 +37,7 @@ use sp_runtime::{
 
 use crate::{
 	database::ReadOnlyDB,
-	error::{BackendError, Result},
+	error::Result,
 	read_only_backend::{ReadOnlyBackend, TrieState},
 };
 
@@ -79,8 +79,8 @@ where
 		self.backend.state_at(*id).ok()
 	}
 
-	pub fn runtime_version_at(&self, id: &BlockId<Block>) -> Result<RuntimeVersion> {
-		self.executor.runtime_version(id).map_err(BackendError::from)
+	pub fn runtime_version_at(&self, id: &BlockId<Block>) -> sp_blockchain::Result<RuntimeVersion> {
+		self.executor.runtime_version(id)
 	}
 
 	/// get the backend for this client instance
@@ -108,7 +108,7 @@ where
 	RA: Send + Sync,
 {
 	fn runtime_version(&self, at: &BlockId<Block>) -> Result<sp_version::RuntimeVersion> {
-		self.runtime_version_at(at)
+		self.runtime_version_at(at).map_err(Into::into)
 	}
 }
 
@@ -118,7 +118,7 @@ where
 	Exec: CallExecutor<Block, Backend = ReadOnlyBackend<Block, D>> + Send + Sync,
 	Block: BlockT,
 	RA: ConstructRuntimeApi<Block, Self> + Send + Sync,
-	RA::RuntimeApi: sp_api::Metadata<Block, Error = sp_blockchain::Error> + Send + Sync + 'static,
+	RA::RuntimeApi: sp_api::Metadata<Block> + Send + Sync + 'static,
 {
 	fn metadata(&self, id: &BlockId<Block>) -> Result<sp_core::OpaqueMetadata> {
 		self.runtime_api().metadata(id).map_err(Into::into)
@@ -144,24 +144,23 @@ where
 	E: CallExecutor<Block, Backend = ReadOnlyBackend<Block, D>> + Send + Sync,
 	Block: BlockT,
 {
-	type Error = sp_blockchain::Error;
 	type StateBackend = TrieState<Block, D>;
 
 	fn call_api_at<
 		R: Encode + Decode + PartialEq,
-		NC: FnOnce() -> std::result::Result<R, String> + UnwindSafe,
-		C: CoreApi<Block, Error = sp_blockchain::Error>,
+		NC: FnOnce() -> Result<R, sp_api::ApiError> + UnwindSafe,
+		C: CoreApi<Block>,
 	>(
 		&self,
 		params: CallApiAtParams<Block, C, NC, TrieState<Block, D>>,
-	) -> sp_blockchain::Result<NativeOrEncoded<R>> {
+	) -> Result<NativeOrEncoded<R>, sp_api::ApiError> {
 		let core_api = params.core_api;
 		let at = params.at;
 
 		let (manager, extensions) = self.execution_extensions.manager_and_extensions(at, params.context);
 
-		self.executor.contextual_call::<_, fn(_, _) -> _, _, _>(
-			|| core_api.initialize_block(at, &self.prepare_environment_block(at)?),
+		Ok(self.executor.contextual_call::<_, fn(_, _) -> _, _, _>(
+			|| Ok(core_api.initialize_block(at, &self.prepare_environment_block(at)?)?),
 			at,
 			params.function,
 			&params.arguments,
@@ -172,10 +171,10 @@ where
 			params.native_call,
 			params.recorder,
 			Some(extensions),
-		)
+		)?)
 	}
 
-	fn runtime_version_at(&self, at: &BlockId<Block>) -> sp_blockchain::Result<RuntimeVersion> {
-		self.runtime_version_at(at).map_err(|e| sp_blockchain::Error::VersionInvalid(e.to_string()))
+	fn runtime_version_at(&self, at: &BlockId<Block>) -> Result<RuntimeVersion, sp_api::ApiError> {
+		Ok(self.runtime_version_at(at)?)
 	}
 }

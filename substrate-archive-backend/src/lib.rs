@@ -50,7 +50,7 @@ pub trait ApiAccess<Block, Backend, Runtime>:
 	+ Sized
 	+ Send
 	+ Sync
-	+ CallApiAt<Block, Error = sp_blockchain::Error, StateBackend = Backend::State>
+	+ CallApiAt<Block, StateBackend = Backend::State>
 	+ GetMetadata<Block>
 	+ GetRuntimeVersion<Block>
 where
@@ -66,7 +66,7 @@ where
 	Runtime: ConstructRuntimeApi<Block, Self>,
 	Backend: BackendT<Block>,
 	Client: ProvideRuntimeApi<Block, Api = Runtime::RuntimeApi>
-		+ CallApiAt<Block, Error = sp_blockchain::Error, StateBackend = Backend::State>
+		+ CallApiAt<Block, StateBackend = Backend::State>
 		+ GetMetadata<Block>
 		+ GetRuntimeVersion<Block>
 		+ Sized
@@ -76,7 +76,7 @@ where
 }
 
 /// A set of APIs that runtimes must implement in order to be compatible with substrate-archive.
-pub trait RuntimeApiCollection<Block>: sp_api::ApiExt<Block, Error = sp_blockchain::Error>
+pub trait RuntimeApiCollection<Block>: sp_api::ApiExt<Block>
 where
 	Block: BlockT,
 	<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
@@ -86,7 +86,7 @@ where
 impl<Api, Block> RuntimeApiCollection<Block> for Api
 where
 	Block: BlockT,
-	Api: sp_api::ApiExt<Block, Error = sp_blockchain::Error>,
+	Api: sp_api::ApiExt<Block>,
 	<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
 {
 }
