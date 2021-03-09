@@ -106,7 +106,9 @@ where
 			Ok(backend.iter_blocks(|n| fun(n))?.enumerate().map(|(_, b)| b).collect())
 		};
 		let blocks = smol::unblock(gather_blocks).await?;
-		log::info!("Took {:?} to load {} blocks", now.elapsed(), blocks.len());
+		if !blocks.is_empty() {
+			log::info!("Took {:?} to load {} blocks", now.elapsed(), blocks.len());
+		}
 		let cache = self.rt_cache.clone();
 		let blocks = smol::unblock(move || {
 			// Finds the versions of all the blocks, returns a new set of type `Block`.
